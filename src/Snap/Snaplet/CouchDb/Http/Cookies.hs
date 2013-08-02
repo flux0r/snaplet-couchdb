@@ -41,7 +41,7 @@ instance Ord Cookie where
       where
         timeComparison = case (cookieCreated x, cookieCreated y) of
             (Just tx, Just ty)      -> compare tx ty
-            otherwise               -> EQ
+            otherwise               -> LT
 
 domainMatches :: ByteString -> ByteString -> Bool
 domainMatches x y
