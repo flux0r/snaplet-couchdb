@@ -57,6 +57,7 @@ data Cookie = Cookie {
     cookieSecureOnlyFlag    :: !Bool,
     cookieHttpOnlyFlag      :: !Bool
 }
+  deriving (Show)
 
 type CookieKey = (ByteString, ByteString, ByteString)
 type Cookies = Map CookieKey Cookie

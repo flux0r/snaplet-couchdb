@@ -43,6 +43,16 @@ instance Ord Cookie where
             (Just tx, Just ty)      -> compare tx ty
             otherwise               -> LT
 
+validCookieDomain :: Cookie -> ByteString -> Bool
+validCookieDomain cok host =
+    cookieDomainHostEq cok host || cookieDomainHostMatch cok host
+
+cookieDomainHostEq :: Cookie -> ByteString -> Bool
+cookieDomainHostEq = flip (maybe False . (==)) . cookieDomain
+
+cookieDomainHostMatch :: Cookie -> ByteString -> Bool
+cookieDomainHostMatch = domainMatches . domain
+
 domainMatches :: ByteString -> ByteString -> Bool
 domainMatches x y
   | x == y                              = True
@@ -53,3 +63,15 @@ domainMatches x y
   | otherwise                           = False
   where
     lastChar = B.singleton (B.last $ diffByteString x y)
+
+mkUriPath :: Request p m a -> ByteString
+mkUriPath req =
+    if invalid uriPath
+        then slash
+        else B.reverse $ B.tail $ C.dropWhile (/= '/') $ B.reverse uriPath
+  where
+    uriPath     = reqPath req
+    slash       = U.fromString "/"
+    invalid x   = B.null x
+                    || B.singleton (B.head x) /= slash
+                    || C.count '/' x <= 1
