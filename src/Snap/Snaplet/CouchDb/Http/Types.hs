@@ -27,21 +27,22 @@ newtype ConnectionWrapper = ConnectionWrapper (forall m. (Monad m)
     -> m (Maybe Int))
 
 data Request p m a = Request {
-    reqMethod       :: H.Method,
+    reqMethod       :: !H.Method,
     reqHost         :: !ByteString,
-    reqPort         :: Int,
+    reqPort         :: !Int,
     reqPath         :: !ByteString,
     reqQueryString  :: !ByteString,
-    reqHeaders      :: H.RequestHeaders,
+    reqHeaders      :: !H.RequestHeaders,
     reqBody         :: RequestBody p m a,
-    reqHostAddr     :: Maybe N.HostAddress,
-    reqRawBody      :: Bool,
+    reqHostAddr     :: !(Maybe N.HostAddress),
+    reqRawBody      :: !Bool,
     reqDecompress   :: !ContentType,
-    reqRedirectMax  :: Int,
-    reqCheckStatus  :: ReqCheckStatus,
-    reqTimeout      :: Maybe Int,
+    reqRedirectMax  :: !Int,
+    reqCheckStatus  :: !ReqCheckStatus,
+    reqTimeout      :: !(Maybe Int),
     reqConnWrapper  :: ConnectionWrapper,
-    reqCookies      :: Cookies
+    reqCookies      :: Cookies,
+    reqSecure       :: !Bool
 }
 
 data Cookie = Cookie {
