@@ -1,0 +1,34 @@
+diff --git a/src/Snap/Snaplet/CouchDb/Http/Cookies.hs b/src/Snap/Snaplet/CouchDb/Http/Cookies.hs
+index c6794bc..4371eb0 100644
+--- a/src/Snap/Snaplet/CouchDb/Http/Cookies.hs
++++ b/src/Snap/Snaplet/CouchDb/Http/Cookies.hs
+@@ -15,6 +15,7 @@ import Data.ByteString (ByteString)
+import qualified Data.ByteString as B
+import Snap.Snaplet.CouchDb.Http.Types
+import Snap.Snaplet.CouchDb.Utils
++import Data.Time (UTCTime)
+
+domain, path :: Cookie -> ByteString
+domain = maybeByteString id . cookieDomain
+@@ -28,8 +29,6 @@ emptyCookies = Map.empty
+
+addCookies = undefined
+
+-rmExpiredCookies = undefined
+-
+instance Eq Cookie where
+    x == y = getCookieKey x == getCookieKey y
+
+@@ -75,3 +74,12 @@ mkUriPath req =
+    invalid x   = B.null x
+                    || B.singleton (B.head x) /= slash
+                    || C.count '/' x <= 1
++
++expiredCookie :: UTCTime -> Cookie -> Bool
++--expiredCookie t = maybe False ((<= t) . cookieExpires)
++expiredCookie t cok = case cookieExpires cok of
++    Nothing     -> False
++    Just t'     -> t' <= t
++
++rmExpiredCookies :: UTCTime -> Cookies -> Cookies
++rmExpiredCookies t = Map.filter (expiredCookie t)

@@ -12,6 +12,7 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.UTF8 as U
 import qualified Data.ByteString.Char8 as C
 import Text.Regex (Regex, mkRegex, matchRegex)
+import Control.Monad.IO.Class (MonadIO, liftIO)
 
 maybeByteString :: (a -> ByteString) -> Maybe a -> ByteString
 maybeByteString = maybe B.empty
@@ -35,3 +36,6 @@ startsWithSlashC x = maybe False ((== '/') . fst) (C.uncons x)
 
 fixPathC :: C.ByteString -> C.ByteString
 fixPathC x = if startsWithSlashC x then x else C.cons '/' x
+
+liftedNow :: MonadIO m => m UTCTime
+liftedNow = liftIO getCurrentTime
