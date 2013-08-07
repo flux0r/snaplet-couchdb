@@ -26,13 +26,17 @@ newtype ConnectionWrapper = ConnectionWrapper (forall m. (Monad m)
     -> HttpError
     -> m (Maybe Int))
 
+type Headers = Map H.HeaderName ByteString
+type RequestHeaders = Headers
+type ResponseHeaders = Headers
+
 data Request p m a = Request {
     reqMethod       :: !H.Method,
     reqHost         :: !ByteString,
     reqPort         :: !Int,
     reqPath         :: !ByteString,
     reqQueryString  :: !ByteString,
-    reqHeaders      :: !H.RequestHeaders,
+    reqHeaders      :: !RequestHeaders,
     reqBody         :: RequestBody p m a,
     reqHostAddr     :: !(Maybe N.HostAddress),
     reqRawBody      :: !Bool,
@@ -98,7 +102,7 @@ data HttpError =
 data Response body = Response {
     resStatus       :: H.Status,
     resVersion      :: H.HttpVersion,
-    resHeaders      :: H.ResponseHeaders,
+    resHeaders      :: !ResponseHeaders,
     resBody         :: body,
     resCookies      :: Cookies
 }

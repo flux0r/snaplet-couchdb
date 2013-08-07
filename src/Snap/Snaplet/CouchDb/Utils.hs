@@ -13,6 +13,7 @@ import qualified Data.ByteString.UTF8 as U
 import qualified Data.ByteString.Char8 as C
 import Text.Regex (Regex, mkRegex, matchRegex)
 import Control.Monad.IO.Class (MonadIO, liftIO)
+import Data.Time (UTCTime, getCurrentTime)
 
 maybeByteString :: (a -> ByteString) -> Maybe a -> ByteString
 maybeByteString = maybe B.empty

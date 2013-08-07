@@ -4,9 +4,11 @@ module Snap.Snaplet.CouchDb.Http.Cookies (
     addCookies,
     emptyCookies,
     getCookieKey,
-    rmStaleCookies
+    rmStaleCookies,
+    mkCookieString
 ) where
 
+import Data.List (sort)
 import Control.Applicative (pure, (<*>))
 import qualified Data.Map as Map
 import qualified Data.ByteString.UTF8 as U
@@ -29,7 +31,11 @@ getCookieKey = pure (,,) <*> cookieName <*> domain <*> path
 emptyCookies :: Cookies
 emptyCookies = Map.empty
 
+-- addCookies :: Request p m a -> Cookies -> UTCTime -> (Request p m a, Cookies)
+-- addCookies req coks t = let (cokStr, coks') = mkCookieString req coks t in
+
 addCookies = undefined
+    
 
 matchingCookie :: Request p m a -> Bool -> Cookie -> Bool
 matchingCookie req httpReq cok =
@@ -58,7 +64,10 @@ mkCookiePair :: Cookie -> (ByteString, ByteString)
 mkCookiePair = pure (,) <*> cookieName <*> cookieValue
 
 mkCookiePairs :: Cookies -> [(ByteString, ByteString)]
-mkCookiePairs cs = Map.foldr ((:) . mkCookiePair) [] cs
+mkCookiePairs cs = map mkCookiePair $ sortedList cs
+  where
+    -- Data.Map sorts by keys, but RFC says to sort by cookie.
+    sortedList = sort . Map.elems
 
 updateAccessTime :: UTCTime -> Cookie -> Cookie
 updateAccessTime t cok = cok { cookieLastAccessed = Just t }
