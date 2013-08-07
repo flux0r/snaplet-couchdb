@@ -1,15 +1,12 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Snap.Snaplet.CouchDb.Http.Cookies (
-    addCookies,
-    emptyCookies,
-    getCookieKey,
-    rmStaleCookies,
-    mkCookieString
-) where
+module Snap.Snaplet.CouchDb.Http.Cookies where
 
 import Data.List (sort)
+import qualified Data.CaseInsensitive as CI
+import qualified Network.HTTP.Types as H
 import Control.Applicative (pure, (<*>))
+import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.ByteString.UTF8 as U
 import qualified Data.ByteString.Char8 as C
@@ -31,14 +28,27 @@ getCookieKey = pure (,,) <*> cookieName <*> domain <*> path
 emptyCookies :: Cookies
 emptyCookies = Map.empty
 
--- addCookies :: Request p m a -> Cookies -> UTCTime -> (Request p m a, Cookies)
--- addCookies req coks t = let (cokStr, coks') = mkCookieString req coks t in
+------------------------------------------------------------------------------
+-- | Add cookies to a request by computing a cookie_string for the cookies
+-- passed in and then updating the cookie header of the request. Return the
+-- new request and the new cookie store, which has a new last-accessed-time
+-- for each cookie.
+addCookies :: Request p m a
+           -> Cookies
+           -> UTCTime                   -- ^ The time for last-accessed-time
+           -> Bool                      -- ^ Is the request for a HTTP API?
+           -> (Request p m a, Cookies)
+addCookies req coks t httpApi = (if B.null cokStr then req else req', coks')
+  where
+    (cokStr, coks') = mkCookieString req coks t httpApi
+    req' = req { reqHeaders = newHeaders }
+    newHeaders = uncurry Map.insert (mkCookieHeader cokStr) $ reqHeaders req
 
-addCookies = undefined
-    
+mkCookieHeader :: a -> (H.HeaderName, a)
+mkCookieHeader cokStr = (H.hCookie, cokStr)
 
 matchingCookie :: Request p m a -> Bool -> Cookie -> Bool
-matchingCookie req httpReq cok =
+matchingCookie req httpApi cok =
     validHost && validPath && validSecure && validHttp
   where
     dom = cookieDomain cok
@@ -49,9 +59,12 @@ matchingCookie req httpReq cok =
                     else maybe False (domainMatches host) dom
     validPath = maybe False (pathMatches host) dom
     validSecure = not (cookieSecureOnlyFlag cok) || reqSecure req
-    validHttp = not (cookieHttpOnlyFlag cok) || httpReq
+    validHttp = not (cookieHttpOnlyFlag cok) || httpApi
 
-matchingCookies :: Request p m a -> Bool -> Cookies -> Cookies
+matchingCookies :: Request p m a
+                -> Bool
+                -> Cookies
+                -> Cookies
 matchingCookies = (Map.filter .) . matchingCookie
 
 staleCookie :: UTCTime -> Cookie -> Bool
