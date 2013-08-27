@@ -4,6 +4,7 @@ module Snap.Snaplet.CouchDb.Utils (
     isIpAddress,
     ipv4Regex,
     maybeByteString,
+    liftedNow
 ) where
 
 import Control.Error

@@ -3,6 +3,7 @@
 module Snap.Snaplet.CouchDb.Http.Cookies where
 
 import Data.List (sort)
+import Data.Monoid(mappend, mempty)
 import qualified Data.CaseInsensitive as CI
 import qualified Network.HTTP.Types as H
 import Control.Applicative (pure, (<*>))
@@ -15,8 +16,8 @@ import qualified Data.ByteString as B
 import Snap.Snaplet.CouchDb.Http.Types
 import Snap.Snaplet.CouchDb.Utils
 import Data.Time (UTCTime)
-import Web.Cookie (renderCookies)
-import Blaze.ByteString.Builder (toByteString)
+import Blaze.ByteString.Builder (Builder, toByteString, fromByteString)
+import Blaze.ByteString.Builder.Char8 (fromChar)
 
 domain, path :: Cookie -> ByteString
 domain = maybeByteString id . cookieDomain
@@ -27,6 +28,14 @@ getCookieKey = pure (,,) <*> cookieName <*> domain <*> path
 
 emptyCookies :: Cookies
 emptyCookies = Map.empty
+
+renderCookie :: (ByteString, ByteString) -> Builder
+renderCookie (k, v) = fromByteString k `mappend` fromChar '='
+
+renderCookies [] = mempty
+renderCookies xs = foldr1 iter $ map renderCookie xs
+  where
+    iter x y = x `mappend` fromChar ';' `mappend` y
 
 ------------------------------------------------------------------------------
 -- | Add cookies to a request by computing a cookie_string for the cookies
@@ -72,6 +81,13 @@ staleCookie t cok = maybe False (< t) (cookieExpires cok)
 
 rmStaleCookies :: UTCTime -> Cookies -> Cookies
 rmStaleCookies = Map.filter . staleCookie
+
+freshenCookies :: UTCTime
+               -> Request p m a
+               -> Bool
+               -> (Request p m a, Cookies)
+freshenCookies now req http =
+    addCookies req (rmStaleCookies now $ reqCookies req) now http
 
 mkCookiePair :: Cookie -> (ByteString, ByteString)
 mkCookiePair = pure (,) <*> cookieName <*> cookieValue
@@ -155,3 +171,7 @@ pathMatches urip cokp
   | otherwise = False
   where
     remainder = B.drop (B.length cokp) urip
+
+insertCookie cok coks = Map.insert (getCookieKey cok) cok coks
+
+exTest cok coks = return $ Map.insert (getCookieKey cok) cok coks
