@@ -21,10 +21,6 @@ type ContentType = ByteString
 type ReqCheckStatus = H.Status -> H.ResponseHeaders ->
                       Cookies -> Maybe HttpError
 
-newtype ConnectionWrapper = ConnectionWrapper (forall m. (Monad m)
-    => Maybe Int
-    -> HttpError
-    -> m (Maybe Int))
 
 type Headers = Map H.HeaderName ByteString
 type RequestHeaders = Headers
@@ -44,7 +40,6 @@ data Request p m a = Request {
     reqRedirectMax  :: !Int,
     reqCheckStatus  :: !ReqCheckStatus,
     reqTimeout      :: !(Maybe Int),
-    reqConnWrapper  :: ConnectionWrapper,
     reqCookies      :: Cookies,
     reqSecure       :: !Bool
 }
@@ -81,7 +76,7 @@ data HttpProxy = Proxy {
 
 data HttpError =
     StatusError H.Status H.ResponseHeaders Cookies
-  | InvalidUrl String String
+  | InvalidUrl String
   | TooManyRedirects [Response L.ByteString]
   | UnparseableRedirect (Response L.ByteString)
   | TooManyRetries
