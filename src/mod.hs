@@ -4,3 +4,6 @@ import Snap.Snaplet.CouchDb.Utils
 import Snap.Snaplet.CouchDb.Http
 
 import qualified Data.Map as Map
+
+
+import Snap.Snaplet.CouchDb.Http.Request

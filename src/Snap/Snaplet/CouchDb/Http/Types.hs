@@ -17,50 +17,47 @@ import Control.Proxy
 import Control.Exception (IOException)
 
 type ContentType = ByteString
-
 type ReqCheckStatus = H.Status -> H.ResponseHeaders ->
-                      Cookies -> Maybe HttpError
-
-
+                            Cookies -> Maybe HttpError
 type Headers = Map H.HeaderName ByteString
 type RequestHeaders = Headers
 type ResponseHeaders = Headers
+type CookieKey = (ByteString, ByteString, ByteString)
+type Cookies = Map CookieKey Cookie
 
 data Request p m a = Request {
-    reqMethod       :: !H.Method,
-    reqHost         :: !ByteString,
-    reqPort         :: !Int,
-    reqPath         :: !ByteString,
-    reqQueryString  :: !ByteString,
-    reqHeaders      :: !RequestHeaders,
+    reqMethod       :: H.Method,
+    reqHost         :: ByteString,
+    reqPort         :: Int,
+    reqPath         :: ByteString,
+    reqQueryString  :: ByteString,
+    reqHeaders      :: RequestHeaders,
     reqBody         :: RequestBody p m a,
-    reqHostAddr     :: !(Maybe N.HostAddress),
-    reqRawBody      :: !Bool,
-    reqDecompress   :: !ContentType,
-    reqRedirectMax  :: !Int,
-    reqCheckStatus  :: !ReqCheckStatus,
-    reqTimeout      :: !(Maybe Int),
+    reqHostAddr     :: (Maybe N.HostAddress),
+    reqRawBody      :: Bool,
+    reqDecompress   :: ContentType -> Bool,
+    reqRedirectMax  :: Int,
+    reqCheckStatus  :: ReqCheckStatus,
+    reqTimeout      :: (Maybe Int),
     reqCookies      :: Cookies,
-    reqSecure       :: !Bool
+    reqSecure       :: Bool,
+    reqFrag         :: Maybe ByteString
 }
 
 data Cookie = Cookie {
-    cookieName              :: !ByteString,
-    cookieValue             :: !ByteString,
-    cookieExpires           :: !(Maybe UTCTime),
-    cookieDomain            :: !(Maybe ByteString),
-    cookiePath              :: !(Maybe ByteString),
-    cookieCreated           :: !(Maybe UTCTime),
-    cookieLastAccessed      :: !(Maybe UTCTime),
-    cookiePersistentFlag    :: !Bool,
-    cookieHostOnlyFlag      :: !Bool,
-    cookieSecureOnlyFlag    :: !Bool,
-    cookieHttpOnlyFlag      :: !Bool
+    cookieName              :: ByteString,
+    cookieValue             :: ByteString,
+    cookieExpires           :: (Maybe UTCTime),
+    cookieDomain            :: (Maybe ByteString),
+    cookiePath              :: (Maybe ByteString),
+    cookieCreated           :: (Maybe UTCTime),
+    cookieLastAccessed      :: (Maybe UTCTime),
+    cookiePersistentFlag    :: Bool,
+    cookieHostOnlyFlag      :: Bool,
+    cookieSecureOnlyFlag    :: Bool,
+    cookieHttpOnlyFlag      :: Bool
 }
   deriving (Show)
-
-type CookieKey = (ByteString, ByteString, ByteString)
-type Cookies = Map CookieKey Cookie
 
 data RequestBody p m a =
     RequestBodyLazy L.ByteString
@@ -76,7 +73,7 @@ data HttpProxy = Proxy {
 
 data HttpError =
     StatusError H.Status H.ResponseHeaders Cookies
-  | InvalidUrl String
+  | InvalidUrl String String
   | TooManyRedirects [Response L.ByteString]
   | UnparseableRedirect (Response L.ByteString)
   | TooManyRetries
@@ -97,7 +94,7 @@ data HttpError =
 data Response body = Response {
     resStatus       :: H.Status,
     resVersion      :: H.HttpVersion,
-    resHeaders      :: !ResponseHeaders,
+    resHeaders      :: ResponseHeaders,
     resBody         :: body,
     resCookies      :: Cookies
 }
