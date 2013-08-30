@@ -26,7 +26,7 @@ type CookieKey = (ByteString, ByteString, ByteString)
 type Cookies = Map CookieKey Cookie
 
 data Request p m a = Request {
-    reqMethod       :: H.Method,
+    reqMethod       :: H.StdMethod,
     reqHost         :: ByteString,
     reqPort         :: Int,
     reqPath         :: ByteString,

@@ -2,6 +2,13 @@
 
 module Snap.Snaplet.CouchDb.Http.Request where
 
+import Data.Int (Int64)
+import qualified Data.CaseInsensitive as CI
+import Data.CaseInsensitive (CI)
+import Data.Monoid (mappend, mempty)
+import qualified Blaze.ByteString.Builder as BB
+import qualified Data.ByteString as B
+import Data.ByteString (ByteString)
 import Control.Error (note, readErr)
 import Snap.Snaplet.CouchDb.Http.Types (HttpError (InvalidUrl, StatusError),
                                         Request (..), RequestBody (..),
@@ -12,6 +19,10 @@ import qualified Data.ByteString.Char8 as C8
 import qualified Data.ByteString.Lazy as L
 import qualified Data.Map as Map
 
+
+------------------------------------------------------------------------------
+-- Constants
+
 defaultReqRedirectMax,
     defaultTimeout,
     defaultPort,
@@ -21,8 +32,28 @@ defaultTimeout              = 5
 defaultPort                 = 80
 defaultSecPort              = 443
 
+schemeHttp,
+    schemeHttps :: String
 schemeHttp = "http:"
 schemeHttps = "https:"
+
+contentLengthHeaderKey :: CI ByteString
+contentLengthHeaderKey = "Content-Length"
+
+tarBall :: ContentType
+tarBall = "application/x-tar"
+
+
+------------------------------------------------------------------------------
+-- URIs
+
+escape :: String -> String
+escape = U.escapeURIString U.isAllowedInURI
+
+parseUrl :: String -> Either HttpError U.URI
+parseUrl x = note (InvalidUrl x msg) (U.parseURI $ escape x)
+  where
+    msg = "Parse failure"
 
 mkUri :: Request p m a -> U.URI
 mkUri req = U.URI
@@ -81,9 +112,19 @@ getAuth :: U.URI -> Either HttpError U.URIAuth
 getAuth u = note (InvalidUrl (show u) "Relative URLs not supported")
                  (U.uriAuthority u)
 
+
+------------------------------------------------------------------------------
+-- Requests
+
+browserDecompress :: ContentType -> Bool
+browserDecompress = (/=) tarBall
+
+decompress :: ContentType -> Bool
+decompress = const True
+
 defaultRequest :: Request p m a
 defaultRequest = Request
-    { reqMethod             = "GET"
+    { reqMethod             = H.GET
     , reqHost               = "localhost"
     , reqPort               = 80
     , reqPath               = C8.singleton '/'
@@ -101,6 +142,27 @@ defaultRequest = Request
     , reqFrag               = Nothing
     }
 
+instance Show (Request p m a) where
+    show x = unlines
+        [ "Request {"
+        , "\tmethod             = " ++ show (reqMethod x)
+        , "\thost               = " ++ show (reqHost x)
+        , "\tport               = " ++ show (reqPort x)
+        , "\tpath               = " ++ show (reqPath x)
+        , "\tquery              = " ++ show (reqQueryString x)
+        , "\theaders            = " ++ show (reqHeaders x)
+        , "\thost address       = " ++ show (reqHostAddr x)
+        , "\traw body           = " ++ show (reqRawBody x)
+        , "\ttimeout            = " ++ show (reqTimeout x)
+        , "\tcookies            = " ++ show (reqCookies x)
+        , "\tsecure             = " ++ show (reqSecure x)
+        , "\tfragment           = " ++ show (reqFrag x)
+        ]
+
+
+------------------------------------------------------------------------------
+-- Status
+
 normalStatus :: Int -> Bool
 normalStatus code = code >= 200 && code < 300
 
@@ -113,16 +175,54 @@ defaultReqCheckStatus s@(H.Status code _) hs coks =
         then Nothing
         else Just $ StatusError s hs coks
 
-tarBall :: ContentType
-tarBall = "application/x-tar"
 
-browserDecompress :: ContentType -> Bool
-browserDecompress = (/=) tarBall
+------------------------------------------------------------------------------
+-- Headers
 
-escape :: String -> String
-escape = U.escapeURIString U.isAllowedInURI
+hostHeader :: Request p m a -> ByteString
+hostHeader req =
+    let hs = reqHeaders req
+        v = hostHeaderValue req
+    in  Map.findWithDefault v hostHeaderKey hs
 
-parseUrl :: String -> Either HttpError U.URI
-parseUrl x = note (InvalidUrl x msg) (U.parseURI $ escape x)
+hostHeaderKey :: CI ByteString
+hostHeaderKey = "Host"
+ 
+hostHeaderValue :: Request p m a -> ByteString
+hostHeaderValue req
+    | standard      = host
+    | otherwise     = host `mappend` (C8.pack . show $ port)
   where
-    msg = "Parse failure"
+    port = reqPort req
+    secure = reqSecure req
+    host = reqHost req
+    standard =
+            port == defaultPort && not secure
+        ||  port == defaultSecPort && secure
+
+contentLength :: RequestBody p m a -> Maybe Int64
+contentLength (RequestBodyLazy b)       = Just . L.length $ b
+contentLength (RequestBody b)           = Just . fromIntegral . B.length $ b
+contentLength (RequestBodyProducer i _) = Just i
+contentLength _                         = Nothing
+
+
+------------------------------------------------------------------------------
+-- Builders
+
+contentLengthBuilder :: (Eq a, Num a, Show a)
+                     => Maybe a 
+                     -> H.StdMethod
+                     -> BB.Builder
+contentLengthBuilder (Just cl) method = case (cl, method) of
+    (0, H.GET)      -> mempty
+    (0, H.HEAD)     -> mempty
+    _               -> headerToBuilder contentLengthHeaderKey clStr
+  where
+    clStr = C8.pack . show $ cl
+
+headerToBuilder :: H.HeaderName -> ByteString -> BB.Builder
+headerToBuilder k v = BB.fromByteString (CI.original k)
+            `mappend` BB.fromByteString ": "
+            `mappend` BB.fromByteString v
+            `mappend` BB.fromByteString "\r\n"
