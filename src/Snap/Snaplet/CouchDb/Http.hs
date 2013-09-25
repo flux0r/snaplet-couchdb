@@ -11,15 +11,15 @@ import qualified Data.Map as Map
 import System.Timeout (timeout)
 
 
-httpNoRedirects req' resource = let cs = reqCookies req' in
-    do
-        (req, cs') <-
-            if Map.null cs
-                then return (req', cs)
-                else return $ liftedNow >>= \t -> freshenCookies t req' True
-        return (req, cs')
-        (t', res) <- connWrap (reqTimeout req)
-                              (reqFailedConnection req)
+-- httpNoRedirects req' resource = let cs = reqCookies req' in
+--     do
+--         (req, cs') <-
+--             if Map.null cs
+--                 then return (req', cs)
+--                 else return $ liftedNow >>= \t -> freshenCookies t req' True
+--         return (req, cs')
+--         (t', res) <- connWrap (reqTimeout req)
+--                               (reqFailedConnection req)
 
 connWrap :: Maybe Int -> e -> IO a -> IO (Maybe NominalDiffTime, Either e a)
 connWrap Nothing _ f    = fmap (\x -> (Nothing, Right x)) f
