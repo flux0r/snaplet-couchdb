@@ -10,9 +10,9 @@ import qualified Blaze.ByteString.Builder as BB
 import qualified Data.ByteString as B
 import Data.ByteString (ByteString)
 import Control.Error (note, readErr)
-import Snap.Snaplet.CouchDb.Http.Types (HttpError (InvalidUrl, StatusError),
-                                        Request (..), RequestBody (..),
-                                        ContentType, Cookies)
+import Snap.Snaplet.CouchDb.Http.Types (HttpError (..), Request (..),
+                                        RequestBody (..), ContentType,
+                                        Cookies)
 import qualified Network.URI as U
 import qualified Network.HTTP.Types as H
 import qualified Data.ByteString.Char8 as C8
@@ -174,6 +174,9 @@ defaultReqCheckStatus s@(H.Status code _) hs coks =
     if normalStatus code
         then Nothing
         else Just $ StatusError s hs coks
+
+reqFailedConnection r = ConnectionFailure (show . reqHost $ r)
+                                          (reqPort r)
 
 
 ------------------------------------------------------------------------------

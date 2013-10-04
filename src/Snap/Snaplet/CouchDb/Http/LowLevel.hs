@@ -1,7 +1,10 @@
 {-# LANGUAGE RankNTypes #-}
 
+module Snap.Snaplet.CouchDb.Http.LowLevel where
+
 import Control.Concurrent (newMVar)
 import Control.Monad.IO.Class (liftIO, MonadIO)
+import Control.Monad (liftM)
 import qualified Data.ByteString as B
 import Data.ByteString (ByteString)
 import Foreign.C.Error (getErrno, Errno)
@@ -35,7 +38,7 @@ getSock :: Family
 getSock fam typ pro =
     c_socket (packFamily fam) (packSocketType typ) pro >>= \fd ->
         if fd == -1
-            then getErrno >>= return . Left
+            then liftM Left getErrno
             else do
                 setNonBlockingFD fd True
                 sockStat <- newMVar NotConnected
@@ -57,11 +60,23 @@ srcSocket s mem nbytes = M.repeatedly $ do
   where
     fd = fdSocket s
 
+data ConnResource = ConnResource
+    { connMem       :: Ptr CChar
+    , connSock      :: Socket
+    , connBufSize   :: CSize
+    }
+
 checkForeign :: (Integral a, Num b) => a -> IO (Either Errno b)
 checkForeign x =
     if x == -1
-        then getErrno >>= return . Left
-        else return . Right . fromIntegral $ x
+        then badVal
+        else goodVal x
+
+badVal :: IO (Either Errno a)
+badVal = liftM Left getErrno
+
+goodVal :: (Num b, Monad m, Integral a) => a -> m (Either a' b)
+goodVal = return . Right . fromIntegral
 
 fdRecv :: Num a => CInt -> Ptr CChar -> CSize -> IO (Either Errno a)
 fdRecv fd ptr n = c_recv fd ptr n 0 >>= checkForeign

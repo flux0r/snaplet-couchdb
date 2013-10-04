@@ -2,8 +2,10 @@
 
 module Snap.Snaplet.CouchDb.Http.Connection where
 
+import Control.Category (Category)
 import Data.ByteString (ByteString)
 import qualified Data.Machine as M
+import Data.Machine (MachineT, SourceT)
 import qualified Data.ByteString as B
 import Control.Monad.IO.Class (MonadIO, liftIO)
 
@@ -13,7 +15,7 @@ data Connection = Conn
     , connE :: IO ()
     }
 
-connSrc :: MonadIO m => Connection -> M.SourceT m ByteString
+connSrc :: MonadIO m => Connection -> SourceT m ByteString
 connSrc c = M.repeatedly $ iter
   where
     r = connR c
@@ -22,6 +24,9 @@ connSrc c = M.repeatedly $ iter
             then M.stop
             else M.yield xs
 
+connSnk :: (MonadIO m, Category k)
+        => Connection
+        -> MachineT m (k ByteString) o
 connSnk c = M.repeatedly $ iter
   where
     w = connW c

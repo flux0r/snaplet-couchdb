@@ -1,1 +1,1 @@
-import Snap.Snaplet.CouchDb.Http.Connection
+import Snap.Snaplet.CouchDb.Http
