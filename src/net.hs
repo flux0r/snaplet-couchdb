@@ -1,6 +1,7 @@
 import Blaze.ByteString.Builder (Builder)
-import Control.Lens (Accessor (Accessor))
-import Control.Lens ((^..), ix)
+import Control.Applicative ((*>), (<*), (<$>), (<*>))
+import Data.Attoparsec.ByteString.Char8 (Parser, satisfy, string, char,
+                                         decimal, takeTill)
 import Data.ByteString (ByteString)
 import Data.CaseInsensitive (CI, mk, original)
 import Data.Foldable (foldMap)
@@ -8,18 +9,14 @@ import Data.Int (Int64)
 import Data.Traversable (Traversable)
 import Data.HashMap.Strict (HashMap, foldrWithKey)
 import Data.Maybe (fromMaybe)
-import Data.Monoid (Monoid (mempty, mappend, mconcat), (<>))
-import Pipes (Consumer, Producer, (>->), runEffect, yield)
+import Data.Monoid (Monoid (mempty, mconcat))
+import Pipes (Consumer, Consumer', Pipe, Producer, (>->), runEffect, await, yield)
 import Pipes.ByteString (fromLazy)
 
 import qualified Blaze.ByteString.Builder as BU
 import qualified Blaze.ByteString.Builder.Char8 as BC8
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as C8
-
-instance Monoid r => Monoid (Accessor r a) where
-    mempty                              = Accessor mempty
-    mappend (Accessor x) (Accessor y)   = Accessor (x <> y)
 
 data Method = Get
             | Head
@@ -79,6 +76,27 @@ sendRequest c req = let h = connHost c in
 
 readResponseHeader = undefined
 
+readHeaderFields :: Consumer' ByteString IO [ByteString]
+readHeaderFields = iter id >>= \f -> return $ f []
+  where
+    iter xs = await >>= \l ->
+        if C8.null l
+            then return xs
+            else iter (xs . (l:))
+
+parseStatusLine :: Parser (Int, ByteString)
+parseStatusLine = (,) <$> statusCode <*> reasonPhrase
+  where
+    statusCode      =    (string . C8.pack $ "HTTP/1.")
+                      *> satisfy httpVersion
+                      *> char ' '
+                      *> decimal <* char ' '
+    reasonPhrase    = takeTill (== '\r') <* crlfP
+    httpVersion c   = c == '1' || c == '0'
+
+crlfP :: Parser ByteString
+crlfP = string . C8.pack $ "\r\n"
+
 reqBytes :: Request -> ByteString -> Builder
 reqBytes req h = mconcat [reqLine, hLine, headersLine, crlfB]
   where
@@ -89,17 +107,17 @@ reqBytes req h = mconcat [reqLine, hLine, headersLine, crlfB]
     hLine       = hostLineB h req
     headersLine = headersB . unHdrs . reqHeaders $ req
 
-combineHeadersB :: CI ByteString -> ByteString -> Builder -> Builder
-combineHeadersB k v r = mconcat
-    [ r
-    , BU.copyByteString . original $ k
-    , BC8.fromString ": "
-    , BU.fromByteString v
-    , crlfB
-    ]
-
 headersB :: HashMap (CI ByteString) ByteString -> Builder
-headersB = foldrWithKey combineHeadersB mempty        
+headersB = foldrWithKey iter mempty
+  where
+    iter k v r = mconcat
+        [ r
+        , BU.copyByteString . original $ k
+        , BC8.fromString ": "
+        , BU.fromByteString v
+        , crlfB
+        ]
+
 
 methodB :: Method -> Builder
 methodB = BC8.fromString . show
